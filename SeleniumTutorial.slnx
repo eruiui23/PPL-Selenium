@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SeleniumTutorial.Tests/SeleniumTutorial.Tests.csproj" />
+  </Folder>
+</Solution>
