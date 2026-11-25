@@ -12,6 +12,9 @@ public static class DriverFactory
         }
 
         options.AddArgument("--window-size=1920,1080");
+        options.AddUserProfilePreference("credentials_enable_service", false);
+        options.AddUserProfilePreference("profile.password_manager_enabled", false);
+        options.AddUserProfilePreference("profile.password_manager_leak_detection", false);
 
         return new ChromeDriver(options);
     }
