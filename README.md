@@ -187,3 +187,114 @@ dotnet test --filter "FullyQualifiedName~WaitDemoTests"
 #### Kenapa `Thread.Sleep` dan Implicit Wait dihindari?
 - **`Thread.Sleep` adalah anti-pattern**: jika loading butuh 5 detik tapi diisi `Thread.Sleep(2000)`, test pasti gagal; jika diisi `Thread.Sleep(10000)` padahal halaman siap dalam 1 detik, 9 detik terbuang sia-sia di setiap test.
 - **Implicit Wait tidak cukup & berisiko jika dicampur**: Implicit Wait hanya menunggu sampai elemen *ada* di DOM (belum tentu terlihat atau siap diklik), dan dokumentasi resmi Selenium memperingatkan agar tidak mencampur Implicit Wait dengan Explicit Wait karena dapat menimbulkan waktu tunggu total yang tidak terduga.
+
+
+---
+
+## Locators & Page Object Model (POM)
+
+Agar kode pengujian mudah dirawat dan tidak rapuh saat struktur UI berubah, proyek ini memisahkan detail elemen DOM dari skenario pengujian menggunakan pola **Page Object Model (POM)** dan strategi **Locator** yang terstandar.
+
+### 1. Strategi Locator & Prioritas
+
+Prioritas pemilihan locator yang digunakan di proyek ini adalah **`Id` > `Name` > `CSS Selector` > `XPath`**. Khusus pada SauceDemo, hampir seluruh elemen memiliki atribut `data-test` yang stabil, sehingga konvensi utama proyek menggunakan `By.CssSelector("[data-test='...']")`.
+
+Enam strategi locator Selenium didemokan pada `src/SeleniumTutorial.Tests/Tests/LocatorDemoTests.cs` (melalui method di `LoginPage` dan `InventoryPage`):
+
+| Strategi | Contoh di Proyek | Kapan Cocok Digunakan |
+|---|---|---|
+| `By.Id` | `By.Id("user-name")` | Elemen memiliki `id` yang unik dan statis (paling cepat dan spesifik). |
+| `By.Name` | `By.Name("password")` | Elemen form (`input`, `select`) yang memiliki atribut `name` stabil. |
+| `By.CssSelector` | `By.CssSelector("[data-test='login-button']")` | Konvensi utama proyek untuk atribut `data-test`, kombinasi class, atau struktur CSS. |
+| `By.ClassName` | Dipakai di `InventoryPage.CountProductsByClassName()` | Mengambil daftar elemen dengan satu nama class yang sama (mis. daftar kartu produk). |
+| `By.XPath` | Dipakai di `InventoryPage.GetProductPriceByXPath(...)` | Menavigasi relasi DOM kompleks atau mencocokkan teks elemen yang tidak punya `id`/`data-test`. |
+| `By.LinkText` | Dipakai di `InventoryPage.OpenProductDetailsByLinkText(...)` | Mengklik tautan (`<a>`) berdasarkan teks tautan persis seperti yang tampil di layar. |
+
+Daftar pemetaan locator SauceDemo tersedia di `src/SeleniumTutorial.Tests/Pages/LOCATORS.md`.
+
+### 2. Struktur Page Object Model
+
+1. **`BasePage` (`src/SeleniumTutorial.Tests/Pages/BasePage.cs`):**
+   Menyimpan `Driver` dan `Wait` (`WaitHelper.Create(driver)`), serta menyediakan helper aksi yang aman terhadap elemen dinamis: `WaitForVisible`, `WaitForClickable`, `Click`, `Type`, `GetText`, `IsDisplayed`, dan `WaitForUrlToContain`.
+2. **Page Classes (`LoginPage`, `InventoryPage`, `CartPage`, `CheckoutPage`, `DynamicLoadingPage`):**
+   - Seluruh locator disimpan sebagai field `private static readonly By` di dalam Page class.
+   - Method aksi mengembalikan instance Page tujuan (fluent API), misalnya `Login(...)` di `LoginPage` mengembalikan `InventoryPage`:
+     ```csharp
+     public InventoryPage Login(string username, string password)
+     {
+         EnterUsername(username);
+         EnterPassword(password);
+         ClickLogin();
+         return new InventoryPage(Driver);
+     }
+     ```
+3. **Test Classes (`LoginTests`, `LocatorDemoTests`, `CartTests`, `CheckoutTests`, `WaitDemoTests`):**
+   - Mewarisi `BaseTest` dan **tidak** memanggil `Driver.FindElement` secara langsung, melainkan hanya memanggil method pada Page Object.
+
+---
+
+## Headless Mode & Screenshots
+
+Fungsionalitas infrastruktur pengujian dipusatkan di `DriverFactory`, `ScreenshotHelper`, dan `BaseTest` sehingga setiap test otomatis mendukung eksekusi headless serta dokumentasi visual saat gagal.
+
+### 1. Headless Mode (`DriverFactory`)
+
+Secara bawaan, `ChromeDriver` berjalan dalam mode *headed* (membuka jendela browser). Untuk mendukung eksekusi di terminal/CI tanpa GUI, `src/SeleniumTutorial.Tests/Utils/DriverFactory.cs` membaca environment variable `HEADLESS`:
+
+```csharp
+public static IWebDriver Create()
+{
+    var options = new ChromeOptions();
+
+    if (string.Equals(Environment.GetEnvironmentVariable("HEADLESS"), "true", StringComparison.OrdinalIgnoreCase))
+    {
+        options.AddArgument("--headless=new");
+    }
+
+    options.AddArgument("--window-size=1920,1080");
+
+    return new ChromeDriver(options);
+}
+```
+
+- Argumen `--window-size=1920,1080` selalu ditambahkan agar ukuran viewport konsisten di mode *headed* maupun *headless*.
+- Untuk mengaktifkan mode *headless*:
+  - **Linux / macOS (Bash):** `HEADLESS=true dotnet test`
+  - **Windows (PowerShell):** `$env:HEADLESS="true"; dotnet test`
+
+### 2. Screenshot Otomatis saat Test Gagal (`BaseTest` & `ScreenshotHelper`)
+
+Di `src/SeleniumTutorial.Tests/Tests/BaseTest.cs`, method `[TearDown]` memeriksa status hasil pengujian sebelum menutup browser di blok `finally`:
+
+```csharp
+[TearDown]
+public void TearDown()
+{
+    try
+    {
+        if (TestContext.CurrentContext.Result.Outcome.Status == TestStatus.Failed)
+        {
+            var path = ScreenshotHelper.Capture(Driver, TestContext.CurrentContext.Test.Name);
+            TestContext.AddTestAttachment(path);
+        }
+    }
+    finally
+    {
+        Driver.Quit();
+    }
+}
+```
+
+Saat status test bernilai `TestStatus.Failed`, `ScreenshotHelper.Capture(...)` di `src/SeleniumTutorial.Tests/Utils/ScreenshotHelper.cs`:
+1. Mencari direktori root repository (berdasarkan keberadaan `global.json` atau `.git`).
+2. Membuat folder `TestResults/Screenshots/` jika belum ada (folder ini sudah di-ignore di `.gitignore`).
+3. Membersihkan karakter ilegal dari nama test dan menyimpan gambar dengan format `{testName}_{yyyyMMdd_HHmmss}.png`.
+4. Melampirkan path file gambar ke konteks hasil NUnit melalui `TestContext.AddTestAttachment(path)`.
+
+Untuk mencoba perilaku ini secara langsung melalui demo kegagalan (`FailureDemo`), jalankan:
+
+```powershell
+dotnet test --filter "FullyQualifiedName~AssertFailureDemoTests"
+```
+
+---
