@@ -62,4 +62,30 @@ public class LoginPage : BasePage
     {
         return IsDisplayed(ErrorMessage);
     }
+
+    #region Locator strategy demo (used by LocatorDemoTests)
+
+    // By.Id: fastest and most specific; use it whenever a stable, unique id exists.
+    private static readonly By UsernameInputById = By.Id("user-name");
+
+    // By.Name: good for form fields, which usually have a stable name attribute.
+    private static readonly By PasswordInputByName = By.Name("password");
+
+    public string GetUsernamePlaceholderById()
+    {
+        return WaitForVisible(UsernameInputById).GetDomAttribute("placeholder") ?? string.Empty;
+    }
+
+    public string GetPasswordInputTypeByName()
+    {
+        return WaitForVisible(PasswordInputByName).GetDomAttribute("type") ?? string.Empty;
+    }
+
+    // By.CssSelector: the group convention. LoginButton above already uses [data-test='...'].
+    public string GetLoginButtonTextByCss()
+    {
+        return WaitForVisible(LoginButton).GetDomAttribute("value") ?? string.Empty;
+    }
+
+    #endregion
 }
