@@ -66,11 +66,10 @@ public class CartPage : BasePage
         return new InventoryPage(Driver);
     }
 
-    // TODO: return CheckoutPage once Pages/CheckoutPage.cs is added.
-    public void ProceedToCheckout()
+    public CheckoutPage ProceedToCheckout()
     {
         Click(CheckoutButton);
-        WaitForUrlToContain("/checkout-step-one.html");
+        return new CheckoutPage(Driver);
     }
 
     private static string ToSlug(string productName)
