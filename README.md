@@ -1,5 +1,95 @@
 # PPL-Selenium
 
+Eksplorasi otomasi pengujian web menggunakan **Selenium WebDriver** dengan **C# / .NET 10** dan **NUnit** pada studi kasus [SauceDemo](https://www.saucedemo.com) serta [The Internet (Dynamic Loading)](https://the-internet.herokuapp.com/dynamic_loading).
+
+---
+
+## Pengenalan Selenium & Studi Kasus
+
+**Selenium WebDriver** adalah pustaka otomasi pengujian peramban (*browser*) yang memungkinkan skrip kode berinteraksi langsung dengan elemen halaman web sebagaimana pengguna nyata. Pada proyek ini, Selenium dipadukan dengan **C# / .NET 10** dan **NUnit** untuk menguji alur web modern secara otomatis, terstruktur, dan berulang.
+
+### Arsitektur Singkat WebDriver
+- **Test & Page Object (`SeleniumTutorial.Tests`):** Kode C# + NUnit mengirim perintah aksi atau *assertion* melalui API Selenium WebDriver.
+- **WebDriver / Selenium Manager:** Mengelola komunikasi protokol WebDriver dan membantu penyediaan driver peramban (Chrome) secara otomatis.
+- **Browser (Google Chrome):** Mengeksekusi perintah pada halaman web (baik dalam mode *headed* maupun *headless*) dan mengembalikan status atau elemen DOM ke skrip pengujian.
+
+### Studi Kasus yang Digunakan
+- **SauceDemo (`https://www.saucedemo.com`):** Aplikasi e-commerce sampel untuk mempraktikkan *Page Object Model* (POM), berbagai strategi *locator* (`By.Id`, `By.Name`, `By.CssSelector` berbasis `data-test`, `By.XPath`, `By.ClassName`, dan `By.LinkText`), serta alur *login*, *cart*, dan *checkout*.
+- **The Internet — Dynamic Loading (`https://the-internet.herokuapp.com/dynamic_loading`):** Halaman uji pemuatan DOM asinkron (*Hidden Element* dan *Rendered Element*) untuk mendemokan **Explicit Wait** (`WebDriverWait` melalui `WaitHelper`).
+
+---
+
+## Prasyarat
+
+Pastikan lingkungan pengembangan memenuhi kebutuhan berikut sebelum menjalankan proyek:
+- **.NET 10 SDK** (sesuai `global.json` dengan versi SDK `10.0.100`, `rollForward: latestFeature`, dan target framework `net10.0`).
+- **Google Chrome** terpasang di sistem.
+- **Koneksi internet** saat *restore* paket NuGet dan saat pengujian mengakses situs target (`saucedemo.com` dan `the-internet.herokuapp.com`).
+
+---
+
+## Instalasi
+
+1. **Clone repository:**
+   ```powershell
+   git clone <url-repository-github>
+   cd PPL-Selenium
+   ```
+
+2. **Restore dependensi NuGet dan build solution:**
+   ```powershell
+   dotnet restore SeleniumTutorial.slnx
+   dotnet build SeleniumTutorial.slnx
+   ```
+
+Paket utama yang digunakan di `src/SeleniumTutorial.Tests/SeleniumTutorial.Tests.csproj` meliputi `NUnit`, `NUnit3TestAdapter`, `Microsoft.NET.Test.Sdk`, `Selenium.WebDriver`, dan `Selenium.Support`.
+
+---
+
+## Cara Menjalankan
+
+Jalankan perintah berikut dari direktori root repository:
+
+- **Menjalankan seluruh test utama (mode *headed* default):**
+  ```powershell
+  dotnet test SeleniumTutorial.slnx
+  ```
+
+- **Menjalankan seluruh test dalam mode *headless* (PowerShell):**
+  ```powershell
+  $env:HEADLESS="true"; dotnet test SeleniumTutorial.slnx
+  ```
+
+- **Menjalankan seluruh test dalam mode *headless* (Bash / Linux / macOS):**
+  ```bash
+  HEADLESS=true dotnet test SeleniumTutorial.slnx
+  ```
+
+- **Menjalankan test tertentu berdasarkan nama class/method:**
+  ```powershell
+  dotnet test SeleniumTutorial.slnx --filter "FullyQualifiedName~WaitDemoTests"
+  ```
+
+---
+
+## Hasil yang Diharapkan
+
+- **`dotnet build` dan `dotnet test` berhasil (exit code `0`)** dengan seluruh *test case* pada *Login*, *LocatorDemo*, *Cart*, *Checkout*, dan *WaitDemo* berstatus *Passed*.
+- Pada mode *headless* (`HEADLESS=true`), Chrome berjalan tanpa membuka jendela antarmuka grafis penuh namun tetap mengeksekusi pengujian hingga selesai.
+- Jika terjadi kegagalan *test* (`TestStatus.Failed`), `BaseTest.TearDown()` memanggil `ScreenshotHelper.Capture(...)` untuk menyimpan file `.png` ke folder `TestResults/Screenshots/` dan melampirkannya pada konteks hasil test.
+
+---
+
+## Troubleshooting
+
+- **Gagal *restore* paket NuGet:** Periksa koneksi internet, pastikan konfigurasi NuGet aktif (`dotnet nuget list source`), lalu ulangi `dotnet restore SeleniumTutorial.slnx`.
+- **Ketidaksesuaian versi .NET SDK:** Cek SDK terpasang dengan `dotnet --info` dan pastikan SDK .NET 10 tersedia sesuai `global.json`.
+- **Browser / WebDriver gagal dimulai:** Pastikan Google Chrome terpasang dan mutakhir serta tidak ada proses Chrome/driver yang menggantung di latar belakang.
+- **Test gagal karena elemen lambat muncul atau *stale*:** Pastikan menunggu kondisi yang tepat melalui `WaitHelper` / `BasePage` alih-alih memakai `Thread.Sleep` di kode utama.
+- **Gaya kode tidak sesuai `.editorconfig`:** Jalankan `dotnet format SeleniumTutorial.slnx` sebelum melakukan *commit*.
+
+---
+
 ## Explicit Waits
 
 Pada pengujian web modern (seperti aplikasi React atau halaman yang memuat data secara asinkron), elemen sering kali belum langsung muncul atau belum siap diklik tepat setelah halaman terbuka. Untuk menanganinya dengan stabil dan cepat, proyek ini menggunakan **Explicit Wait** melalui `WebDriverWait`.
