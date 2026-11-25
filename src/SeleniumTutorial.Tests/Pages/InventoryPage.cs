@@ -65,6 +65,40 @@ public class InventoryPage : BasePage
         WaitForUrlToContain("/cart.html");
     }
 
+    #region Locator strategy demo (used by LocatorDemoTests)
+
+    // By.ClassName: accepts exactly ONE class name. "btn btn_primary" would throw
+    // InvalidSelectorException; use By.CssSelector(".btn.btn_primary") for that.
+    private static readonly By InventoryItemsByClassName = By.ClassName("inventory_item");
+
+    // By.XPath: use it when CSS cannot express the query, e.g. matching by text and
+    // then walking to a related element. Here: the price inside the card with this name.
+    private static By ProductPriceByXPath(string productName) =>
+        By.XPath($"//div[@data-test='inventory-item']" +
+                 $"[.//div[@data-test='inventory-item-name' and normalize-space()='{productName}']]" +
+                 $"//div[@data-test='inventory-item-price']");
+
+    // By.LinkText: only works on real <a> elements and matches the exact visible text.
+    private static By ProductTitleLinkByLinkText(string productName) => By.LinkText(productName);
+
+    public int CountProductsByClassName()
+    {
+        return Driver.FindElements(InventoryItemsByClassName).Count;
+    }
+
+    public string GetProductPriceByXPath(string productName)
+    {
+        return GetText(ProductPriceByXPath(productName));
+    }
+
+    public void OpenProductDetailsByLinkText(string productName)
+    {
+        Click(ProductTitleLinkByLinkText(productName));
+        WaitForUrlToContain("/inventory-item.html");
+    }
+
+    #endregion
+
     // "Sauce Labs Bike Light" -> "sauce-labs-bike-light" (same rule SauceDemo uses).
     private static string ToSlug(string productName)
     {
